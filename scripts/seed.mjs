@@ -15,9 +15,20 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { celoSepolia } from "viem/chains";
 
+function parseEnvValue(raw) {
+  const v = raw.trim();
+  if (v.startsWith('"') || v.startsWith("'")) {
+    const q = v[0];
+    const end = v.indexOf(q, 1);
+    return end > 0 ? v.slice(1, end) : v.slice(1);
+  }
+  const hash = v.indexOf(" #");
+  return (hash >= 0 ? v.slice(0, hash) : v).trim();
+}
 for (const line of readFileSync(".env", "utf8").split("\n")) {
-  const m = line.match(/^([A-Z_]+)=(.*)$/);
-  if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^"|"$/g, "");
+  if (/^\s*#/.test(line)) continue;
+  const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/);
+  if (m && !process.env[m[1]]) process.env[m[1]] = parseEnvValue(m[2]);
 }
 
 const M = process.env.NEXT_PUBLIC_CELO_INTENT_MATCHER;

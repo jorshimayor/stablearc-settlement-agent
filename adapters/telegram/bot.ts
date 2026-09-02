@@ -16,10 +16,22 @@ import { Bot } from "grammy";
 import { runSettlementTurn, agentEnvReady } from "../../src/core";
 
 // Load .env for a standalone (non-Next) process, without a dependency.
+// Handles quoted values and strips inline "# comments" like dotenv does.
+function parseEnvValue(raw: string): string {
+  const v = raw.trim();
+  if (v.startsWith('"') || v.startsWith("'")) {
+    const q = v[0];
+    const end = v.indexOf(q, 1);
+    return end > 0 ? v.slice(1, end) : v.slice(1);
+  }
+  const hash = v.indexOf(" #");
+  return (hash >= 0 ? v.slice(0, hash) : v).trim();
+}
 try {
   for (const line of readFileSync(".env", "utf8").split("\n")) {
+    if (/^\s*#/.test(line)) continue;
     const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/);
-    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+    if (m && !process.env[m[1]]) process.env[m[1]] = parseEnvValue(m[2]);
   }
 } catch {
   /* no .env file — rely on the ambient environment */
