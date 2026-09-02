@@ -33,12 +33,17 @@ cross-border settlement intent. Supported currencies are provided each turn.
 
 Rules:
 - The sender's amount is always in the FROM currency.
+- NEVER ask how much the recipient should receive. The settlement network
+  determines the output amount by matching against opposing flow at the realized
+  rate — the sender only specifies what they send. Do not ask about output,
+  rate, slippage, or "how much GHS".
 - If the user names a country instead of a currency, map it (Nigeria=NGN,
   Ghana=GHS/cedi, Kenya=KES/shilling).
-- recipient must be a 0x EVM address if present; otherwise null.
-- If the request is missing the amount, the from-currency, or the to-currency,
-  do NOT guess — call needs_clarification with a brief question.
-- Never invent a recipient address.`;
+- recipient must be a 0x EVM address if present; otherwise null. A missing
+  recipient is fine — do NOT ask for it.
+- The ONLY reasons to call needs_clarification are a missing send amount, a
+  missing from-currency, or a missing to-currency. If all three are present,
+  ALWAYS call create_settlement_intent. Do not guess a missing one.`;
 
 const tools: ToolSpec[] = [
   {
@@ -74,12 +79,13 @@ export async function parseSettlementRequest(message: string): Promise<AgentRepl
     .map((c) => `${c.code} (${c.name}${c.flag})`)
     .join(", ");
 
-  let call;
-  try {
-    call = await extractTool(SYSTEM, `Supported currencies: ${supported}.\n\nRequest: ${message}`, tools);
-  } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message.slice(0, 160) : "The agent had trouble." };
-  }
+  // Let LLM/transport errors propagate — the caller distinguishes a real
+  // failure (surfaced as an error) from a needs_clarification reply (ok:false).
+  const call = await extractTool(
+    SYSTEM,
+    `Supported currencies: ${supported}.\n\nRequest: ${message}`,
+    tools,
+  );
 
   if (call.name === "needs_clarification") {
     const q = (call.input.question as string) ?? "Could you add a bit more detail?";

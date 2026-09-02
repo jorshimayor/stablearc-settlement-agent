@@ -56,11 +56,15 @@ const matcherAbi = [{ type: "function", name: "submitIntent", stateMutability: "
     { name: "reference_", type: "bytes32" }],
   outputs: [{ name: "id", type: "uint256" }] }];
 
-// Opposing standing liquidity, priced loosely (minOut = 1 wei) so it always matches.
+// Opposing standing liquidity, priced at the internally-consistent bootstrap
+// rate (TO per FROM) with a generous tolerance, so each maker's limit rate is
+// meaningful and overlaps the agent's — which is what lets the pure solver
+// actually clear a match (a 1-wei minimum rounds the limit rate to 0).
+const TOL = 0.1;
 const legs = [
-  { from: GHS, to: NGN, amt: 500_000, label: "GHS->NGN" },
-  { from: KES, to: GHS, amt: 5_000_000, label: "KES->GHS" },
-  { from: NGN, to: KES, amt: 5_000_000, label: "NGN->KES" },
+  { from: GHS, to: NGN, amt: 500_000, rate: 100, label: "GHS->NGN" },
+  { from: KES, to: GHS, amt: 5_000_000, rate: 0.2, label: "KES->GHS" },
+  { from: NGN, to: KES, amt: 5_000_000, rate: 0.05, label: "NGN->KES" },
 ];
 
 const expiry = BigInt(Math.floor(Date.now() / 1000) + 7 * 24 * 3600);
@@ -68,13 +72,14 @@ const ref = "0x" + "00".repeat(32);
 
 for (const leg of legs) {
   const amountIn = parseUnits(String(leg.amt), 18);
+  const minOut = parseUnits((leg.amt * leg.rate * (1 - TOL)).toFixed(6), 18);
   const a = await wallet.writeContract({ address: leg.from, abi: erc20, functionName: "approve", args: [M, amountIn] });
   await pub.waitForTransactionReceipt({ hash: a });
   const tx = await wallet.writeContract({
     address: M, abi: matcherAbi, functionName: "submitIntent",
-    args: [leg.from, leg.to, amountIn, 1n, account.address, expiry, ref],
+    args: [leg.from, leg.to, amountIn, minOut, account.address, expiry, ref],
   });
   await pub.waitForTransactionReceipt({ hash: tx });
-  console.log(`seeded ${leg.label}: ${leg.amt} — ${tx}`);
+  console.log(`seeded ${leg.label}: ${leg.amt} @ ${leg.rate} — ${tx}`);
 }
 console.log("liquidity seeded; the agent now has opposing flow to match against.");

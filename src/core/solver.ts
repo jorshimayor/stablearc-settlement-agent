@@ -61,7 +61,11 @@ export async function submitIntent(params: {
   const client = celoPublicClient();
   const wallet = agentWallet();
   const amountIn = parseUnits(params.amountIn.toFixed(6), 18);
-  const minAmountOut = parseUnits(params.minAmountOut.toFixed(6), 18);
+  // The contract requires minAmountOut != 0. A tiny price floor (e.g. 1e-9 on a
+  // corridor with no realized rate yet) rounds to 0 at 6 dp, so clamp to 1 wei —
+  // "accept whatever the match gives" without ever submitting an invalid zero.
+  let minAmountOut = parseUnits(params.minAmountOut.toFixed(6), 18);
+  if (minAmountOut === 0n) minAmountOut = 1n;
   const expiry = BigInt(Math.floor(Date.now() / 1000) + 24 * 3600);
 
   const erc20 = [

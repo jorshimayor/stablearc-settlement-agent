@@ -22,13 +22,22 @@ export function celoPublicClient() {
 }
 
 export function celoExplorerTx(hash: string): string {
-  return `${CELO_CHAIN.blockExplorers?.default.url ?? "https://celo-sepolia.blockscout.com"}/tx/${hash}`;
+  const base = (CELO_CHAIN.blockExplorers?.default.url ?? "https://celo-sepolia.blockscout.com").replace(/\/$/, "");
+  return `${base}/tx/${hash}`;
 }
 
+// Lazy getters so the addresses are read from the environment on access, not at
+// module-load time. This keeps `CELO.intentMatcher` working regardless of when
+// .env is loaded relative to this import — essential for non-Next consumers (the
+// Telegram bot, or StableArc's app) that populate env after importing core.
 export const CELO = {
-  intentMatcher: (process.env.NEXT_PUBLIC_CELO_INTENT_MATCHER as `0x${string}`) || "",
-  realizedOracle: (process.env.NEXT_PUBLIC_CELO_REALIZED_ORACLE as `0x${string}`) || "",
-} as const;
+  get intentMatcher(): `0x${string}` | "" {
+    return (process.env.NEXT_PUBLIC_CELO_INTENT_MATCHER as `0x${string}`) || "";
+  },
+  get realizedOracle(): `0x${string}` | "" {
+    return (process.env.NEXT_PUBLIC_CELO_REALIZED_ORACLE as `0x${string}`) || "";
+  },
+};
 
 export type CeloCurrency = {
   code: string;
@@ -58,6 +67,27 @@ export function celoCurrencies(): CeloCurrency[] {
 
 export function celoCurrencyByCode(code: string): CeloCurrency | undefined {
   return celoCurrencies().find((c) => c.code.toUpperCase() === code.toUpperCase());
+}
+
+/**
+ * Bootstrap cross-rates (units of TO per 1 FROM) used only until the
+ * RealizedRateOracle has a print for a corridor — after that, price comes from
+ * our own settled flow. Kept internally consistent so a ring's rates multiply
+ * to ~1 (NGN→GHS→KES→NGN = 0.01 × 5 × 20 = 1.0), which is what lets local-only
+ * rings clear with no external liquidity. Demo values, not a live FX feed.
+ */
+const BOOTSTRAP_RATES: Record<string, number> = {
+  "NGN->GHS": 0.01,
+  "GHS->NGN": 100,
+  "GHS->KES": 5,
+  "KES->GHS": 0.2,
+  "NGN->KES": 0.05,
+  "KES->NGN": 20,
+};
+
+/** TO-per-FROM bootstrap rate for a corridor, or undefined if unknown. */
+export function bootstrapRate(fromCode: string, toCode: string): number | undefined {
+  return BOOTSTRAP_RATES[`${fromCode.toUpperCase()}->${toCode.toUpperCase()}`];
 }
 
 export function celoAgentReady(): boolean {

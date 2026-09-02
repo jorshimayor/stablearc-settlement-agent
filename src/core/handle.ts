@@ -17,6 +17,7 @@ import { parseSettlementRequest } from "./agent";
 import { llmConfigured } from "./llm";
 import { agentAddress, runCeloSolver, submitIntent } from "./solver";
 import {
+  bootstrapRate,
   celoAgentReady,
   celoCurrencyByCode,
   celoCurrencies,
@@ -101,9 +102,11 @@ export async function runSettlementTurn(message: string): Promise<TurnResult> {
     };
   }
 
-  // 2. Price it from our own realized flow (no external feed). Fall back to a
-  //    tiny floor if this corridor hasn't settled yet.
-  let minOut = 1e-9;
+  // 2. Price it from our own realized flow (no external feed). Before a corridor
+  //    has settled once, fall back to the internally-consistent bootstrap rate
+  //    so the maker's limit is meaningful and the solver can actually clear it.
+  const boot = bootstrapRate(from.code, to.code) ?? 1e-9;
+  let minOut = intent.amount * boot * (1 - TOLERANCE);
   try {
     const client = celoPublicClient();
     const has = (await client.readContract({
@@ -123,7 +126,7 @@ export async function runSettlementTurn(message: string): Promise<TurnResult> {
       if (rate > 0) minOut = intent.amount * rate * (1 - TOLERANCE);
     }
   } catch {
-    /* keep floor */
+    /* keep bootstrap price */
   }
 
   const recipient = (intent.recipient ?? agentAddress()) as `0x${string}`;
