@@ -6,23 +6,34 @@
 // — which is exactly why this same engine drops into StableArc's other spokes.
 
 import { createPublicClient, http, type Chain } from "viem";
-import { celoSepolia } from "viem/chains";
+import { celo, celoSepolia } from "viem/chains";
 
+/**
+ * The active Celo chain, chosen by env at call time (lazy — so it's correct for
+ * non-Next consumers that load .env after importing this module). Set
+ * NEXT_PUBLIC_CELO_CHAIN_ID=42220 for Celo mainnet; anything else (or unset) is
+ * Celo Sepolia testnet. The hackathon scores mainnet only.
+ */
+export function celoChain(): Chain {
+  return Number(process.env.NEXT_PUBLIC_CELO_CHAIN_ID) === 42220 ? celo : celoSepolia;
+}
+
+/** Back-compat alias; prefer celoChain(). */
 export const CELO_CHAIN: Chain = celoSepolia;
 
 export function celoRpcUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_CELO_RPC_URL ||
-    CELO_CHAIN.rpcUrls.default.http[0]
-  );
+  return process.env.NEXT_PUBLIC_CELO_RPC_URL || celoChain().rpcUrls.default.http[0];
 }
 
 export function celoPublicClient() {
-  return createPublicClient({ chain: CELO_CHAIN, transport: http(celoRpcUrl()) });
+  return createPublicClient({ chain: celoChain(), transport: http(celoRpcUrl()) });
 }
 
 export function celoExplorerTx(hash: string): string {
-  const base = (CELO_CHAIN.blockExplorers?.default.url ?? "https://celo-sepolia.blockscout.com").replace(/\/$/, "");
+  const fallback = celoChain().id === 42220
+    ? "https://celoscan.io"
+    : "https://celo-sepolia.blockscout.com";
+  const base = (celoChain().blockExplorers?.default.url ?? fallback).replace(/\/$/, "");
   return `${base}/tx/${hash}`;
 }
 

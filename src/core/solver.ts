@@ -4,7 +4,7 @@
 
 import { createWalletClient, encodeFunctionData, http, parseUnits, type Abi } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { CELO_CHAIN, celoPublicClient, celoRpcUrl, CELO } from "./celo";
+import { celoChain, celoPublicClient, celoRpcUrl, CELO } from "./celo";
 import { intentMatcherAbi } from "./abi";
 import { findPlans, type Intent } from "./matching";
 import { withTag } from "./attribution";
@@ -20,7 +20,7 @@ function agentAccount() {
 function agentWallet() {
   return createWalletClient({
     account: agentAccount(),
-    chain: CELO_CHAIN,
+    chain: celoChain(),
     transport: http(celoRpcUrl()),
   });
 }

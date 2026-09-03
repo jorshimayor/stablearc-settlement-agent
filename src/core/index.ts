@@ -21,6 +21,8 @@ export { dataSuffix, withTag, hasAttributionTag } from "./attribution";
 export {
   CELO,
   CELO_CHAIN,
+  celoChain,
+  bootstrapRate,
   celoPublicClient,
   celoRpcUrl,
   celoExplorerTx,
