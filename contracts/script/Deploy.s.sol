@@ -6,6 +6,7 @@ import "forge-std/Script.sol";
 import {TestStable} from "../src/TestStable.sol";
 import {IntentMatcher} from "../src/IntentMatcher.sol";
 import {RealizedRateOracle} from "../src/RealizedRateOracle.sol";
+import {PredictionMarket} from "../src/PredictionMarket.sol";
 
 /// @notice Deploys the StableArc local-currency settlement stack for the Celo
 ///         "Agents at Work" hackathon.
@@ -42,6 +43,10 @@ contract Deploy is Script {
         cghs.mint(deployer, 1_000_000_000e18);
         ckes.mint(deployer, 1_000_000_000e18);
 
+        // FX/macro prediction & hedge market — resolves off the same
+        // RealizedRateOracle (no external feed), fee 1% to the deployer treasury.
+        PredictionMarket market = new PredictionMarket(deployer, address(oracle), deployer, 100);
+
         vm.stopBroadcast();
 
         console2.log("== StableArc on Celo ==");
@@ -50,9 +55,11 @@ contract Deploy is Script {
         console2.log("cNGN:", address(cngn));
         console2.log("cGHS:", address(cghs));
         console2.log("cKES:", address(ckes));
+        console2.log("PredictionMarket:", address(market));
         console2.log("-- .env for the agent --");
         console2.log("NEXT_PUBLIC_CELO_INTENT_MATCHER=%s", address(matcher));
         console2.log("NEXT_PUBLIC_CELO_REALIZED_ORACLE=%s", address(oracle));
+        console2.log("NEXT_PUBLIC_CELO_PREDICTION_MARKET=%s", address(market));
         console2.log("NEXT_PUBLIC_CELO_TOKEN_NGN=%s", address(cngn));
         console2.log("NEXT_PUBLIC_CELO_TOKEN_GHS=%s", address(cghs));
         console2.log("NEXT_PUBLIC_CELO_TOKEN_KES=%s", address(ckes));
